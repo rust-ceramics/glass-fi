@@ -4,3 +4,4 @@ version = "0.1.0"
 authors = ["Keishi Kawada <Kk-shli@outlook.jp>"]
 
 [dependencies]
+tokio = "0.1"

@@ -2,6 +2,7 @@
 
 use tokio;
 use tokio::prelude::*;
+use tokio::runtime::Runtime;
 use tokio::net::{TcpStream, ConnectFuture};
 use tokio::io;
 use std::net::ToSocketAddrs;
@@ -172,15 +173,42 @@ impl SimpleClient {
                         thread::sleep(milli);
                     }
 
-                    let buffer = vec![0;14343];
+                    let mut in_http_header = false;
+                    let mut http_content_remain: i64 = 0;
                     let http_stream = HttpStream::new(socket);
                     let read_to_end_task = io::lines(http_stream)
                         .map_err(|err| eprintln!("Error: {:?}", err))
-                        .for_each(|input| {
-                            eprintln!("Read: {:?}", input);
-                            Ok(())
+                        .for_each(move |input| {
+                            eprintln!("Read :{}", input);
+                            if !in_http_header && http_content_remain > 0{
+                                http_content_remain -= input.len() as i64;
+                                return Ok(())
+                            }
+                            if let Some(_) = input.find("HTTP") {
+                                in_http_header = true;
+                                return Ok(())
+                            }
+                            match input {
+                                ref x if x.trim().is_empty() => {
+                                    in_http_header = false;
+                                    Ok(())
+                                }
+                                header_content => {
+                                    let mut header_content = header_content.splitn(2, ':');
+                                    let (title, content) = (header_content.next().unwrap(), header_content.next().unwrap());
+                                    if let Some(num) = title.trim().find("Content-Length") {
+                                        if num == 0 {
+                                            http_content_remain = content.trim().parse::<_>().unwrap();
+                                            eprintln!("Content remain: {:?}", &http_content_remain);
+                                        }
+                                    }
+                                    Ok(())
+                                }
+                            }
                         });
-                    tokio::run(read_to_end_task);
+                    let mut http_runtime = Runtime::new().unwrap();
+                    http_runtime.spawn(read_to_end_task);
+                    http_runtime.shutdown_now().wait().unwrap();
                     Ok(())
                 })
                 .map_err(|err| eprintln!("Error: {:?}", err));

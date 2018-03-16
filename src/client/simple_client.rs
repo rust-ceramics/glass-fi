@@ -9,6 +9,7 @@ use std::net::ToSocketAddrs;
 use std::{thread, time};
 use std::cmp;
 use std::io::BufRead;
+use std::sync::{Arc, Mutex};
 
 use url::{self, Url, Host};
 
@@ -158,62 +159,79 @@ impl SimpleClient {
         if let Ok(mut socket_addrs) = issue_list_url.to_socket_addrs() {
             let socket_addr = socket_addrs.next().unwrap();
             let connect_future = TcpStream::connect(&socket_addr);
-            let task = connect_future
-                .and_then(|mut socket| {
-                    let buffer = "GET / HTTP/2.0\nHost: localhost\nConnection: keep-alive\n\n".as_bytes();
-                    loop {
-                        match socket.poll_write(buffer) {
-                            Ok(Async::Ready(_)) => break,
-                            Err(err) => eprintln!("Error: {:?}", err),
-                            _ => {},
+            let content = Arc::new(Mutex::new(String::new()));
+            {
+                let content = content.clone();
+                let task = connect_future
+                    .and_then(move |mut socket| {
+                        let buffer = "GET / HTTP/2.0\nHost: localhost\nConnection: keep-alive\n\n".as_bytes();
+                        loop {
+                            match socket.poll_write(buffer) {
+                                Ok(Async::Ready(_)) => break,
+                                Err(err) => eprintln!("Error: {:?}", err),
+                                _ => {},
+                            }
+
+                            let milli = time::Duration::from_millis(1);
+                            let now = time::Instant::now();
+                            thread::sleep(milli);
                         }
 
-                        let milli = time::Duration::from_millis(1);
-                        let now = time::Instant::now();
-                        thread::sleep(milli);
-                    }
-
-                    let mut in_http_header = false;
-                    let mut http_content_remain: i64 = 0;
-                    let http_stream = HttpStream::new(socket);
-                    let read_to_end_task = io::lines(http_stream)
-                        .map_err(|err| eprintln!("Error: {:?}", err))
-                        .for_each(move |input| {
-                            eprintln!("Read :{}", input);
-                            if !in_http_header && http_content_remain > 0{
-                                http_content_remain -= input.len() as i64;
-                                return Ok(())
-                            }
-                            if let Some(_) = input.find("HTTP") {
-                                in_http_header = true;
-                                return Ok(())
-                            }
-                            match input {
-                                ref x if x.trim().is_empty() => {
-                                    in_http_header = false;
-                                    Ok(())
-                                }
-                                header_content => {
-                                    let mut header_content = header_content.splitn(2, ':');
-                                    let (title, content) = (header_content.next().unwrap(), header_content.next().unwrap());
-                                    if let Some(num) = title.trim().find("Content-Length") {
-                                        if num == 0 {
-                                            http_content_remain = content.trim().parse::<_>().unwrap();
-                                            eprintln!("Content remain: {:?}", &http_content_remain);
-                                        }
+                        let content = content.clone();
+                        let mut in_http_header = false;
+                        let mut http_content_remain: i64 = 0;
+                        let http_stream = HttpStream::new(socket);
+                        let read_to_end_task = io::lines(http_stream)
+                            .map_err(|err| eprintln!("Error: {:?}", err))
+                            .for_each(move |input| {
+                                eprintln!("Read :{}", input);
+                                if !in_http_header && http_content_remain > 0 {
+                                    http_content_remain -= input.len() as i64 + 1;
+                                    let mut content = content.lock().unwrap();
+                                    *content = format!("{}{}\n", *content, input);
+                                    if http_content_remain <= 0 {
+                                        (*content).pop().unwrap();
+                                        return Err(())
                                     }
-                                    Ok(())
+                                    return Ok(())
                                 }
-                            }
-                        });
-                    let mut http_runtime = Runtime::new().unwrap();
-                    http_runtime.spawn(read_to_end_task);
-                    http_runtime.shutdown_now().wait().unwrap();
-                    Ok(())
-                })
-                .map_err(|err| eprintln!("Error: {:?}", err));
-            tokio::run(task);
-            Ok(HttpResponse::new("Hello World!"))
+                                if let Some(_) = input.find("HTTP") {
+                                    in_http_header = true;
+                                    return Ok(())
+                                }
+                                match input {
+                                    ref x if x.trim().is_empty() => {
+                                        in_http_header = false;
+                                        Ok(())
+                                    }
+                                    header_content => {
+                                        let mut header_content = header_content.splitn(2, ':');
+                                        let (title, content) = (header_content.next().unwrap(), header_content.next().unwrap());
+                                        if let Some(num) = title.trim().find("Content-Length") {
+                                            if num == 0 {
+                                                http_content_remain = content.trim().parse::<_>().unwrap();
+                                                eprintln!("Content remain: {:?}", &http_content_remain);
+                                            }
+                                        }
+                                        Ok(())
+                                    }
+                                }
+                            })
+                            .map_err(|err| eprintln!("Error: {:?}", err));
+                        let mut http_runtime = Runtime::new().unwrap();
+                        http_runtime.spawn(read_to_end_task);
+                        http_runtime.shutdown_now().wait().unwrap();
+                        Ok(())
+                    })
+                    .map_err(|err| eprintln!("Error: {:?}", err));
+                let mut rt = Runtime::new().unwrap();
+                rt.spawn(task);
+                rt.shutdown_on_idle().wait().unwrap();
+            }
+            let content = content.clone();
+            let content = content.lock().unwrap();
+            eprintln!("Content:\n{:}", content);
+            Ok(HttpResponse::new((*content).clone()))
         } else {
             Ok(HttpResponse::new("Hello World!"))
         }
@@ -227,7 +245,7 @@ fn simple_get_http() {
     let body_text = response.body.text;
     assert_eq!("Hello World!", body_text);
 
-    //let response = client.get("http://127.0.0.1:81/").unwrap();
-    //let body_text = response.body.text;
-    //assert_eq!("Hello World?", body_text);
+    let response = client.get("http://127.0.0.1:81/").unwrap();
+    let body_text = response.body.text;
+    assert_eq!("Hello World?", body_text);
 }

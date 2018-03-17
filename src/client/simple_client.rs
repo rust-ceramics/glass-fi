@@ -3,7 +3,7 @@
 use tokio;
 use tokio::prelude::*;
 use tokio::runtime::Runtime;
-use tokio::net::{TcpStream, ConnectFuture};
+use tokio::net::{ConnectFuture, TcpStream};
 use tokio::io;
 use std::net::ToSocketAddrs;
 use std::{thread, time};
@@ -11,7 +11,7 @@ use std::cmp;
 use std::io::BufRead;
 use std::sync::{Arc, Mutex};
 
-use url::{self, Url, Host};
+use url::{self, Host, Url};
 
 use std::error;
 use std::fmt;
@@ -20,7 +20,7 @@ use std::io as stdio;
 
 #[derive(Debug)]
 struct HttpBody {
-    text: String
+    text: String,
 }
 
 #[derive(Debug, Clone)]
@@ -43,15 +43,17 @@ impl Iterator for HttpHeaders {
 }
 #[derive(Debug)]
 struct HttpResponse {
+    head: HttpHeaders,
     body: HttpBody,
 }
 
 impl HttpResponse {
-    fn new<S: Into<String>>(body_text: S) -> Self {
+    fn new<S: Into<String>>(head: HttpHeaders, body_text: S) -> Self {
         HttpResponse {
+            head,
             body: HttpBody {
-                text: body_text.into()
-            }
+                text: body_text.into(),
+            },
         }
     }
 }
@@ -67,13 +69,17 @@ enum HttpResponseError {
 impl fmt::Display for HttpResponseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            HttpResponseError::NotHttpScheme => write!(f, "Not HTTP Scheme: input string hasn't http scheme"),
+            HttpResponseError::NotHttpScheme => {
+                write!(f, "Not HTTP Scheme: input string hasn't http scheme")
+            }
             HttpResponseError::ParseURL(ref err) => write!(f, "Parse URL Error: {}", err),
             HttpResponseError::Io(ref err) => write!(f, "IO Error: {}", err),
-            HttpResponseError::InvalidSocketAddress => write!(f, "Invalid socket address: socket address is invalid or nothing"),
+            HttpResponseError::InvalidSocketAddress => write!(
+                f,
+                "Invalid socket address: socket address is invalid or nothing"
+            ),
         }
     }
-
 }
 
 impl error::Error for HttpResponseError {
@@ -91,7 +97,9 @@ impl error::Error for HttpResponseError {
             HttpResponseError::NotHttpScheme => Some(&HttpResponseError::NotHttpScheme),
             HttpResponseError::ParseURL(ref err) => Some(err),
             HttpResponseError::Io(ref err) => Some(err),
-            HttpResponseError::InvalidSocketAddress => Some(&HttpResponseError::InvalidSocketAddress),
+            HttpResponseError::InvalidSocketAddress => {
+                Some(&HttpResponseError::InvalidSocketAddress)
+            }
         }
     }
 }
@@ -117,7 +125,7 @@ struct HttpStream {
     capacity: usize,
 }
 impl HttpStream {
-    fn new(inner: TcpStream) ->  Self {
+    fn new(inner: TcpStream) -> Self {
         HttpStream::with_capacity(DEFAULT_HTTP_BUF_SIZE, inner)
     }
 
@@ -170,28 +178,31 @@ struct SimpleClient {}
 
 impl SimpleClient {
     fn new() -> Self {
-        SimpleClient{}
+        SimpleClient {}
     }
 
     fn get<S: Into<String>>(&self, url: S) -> Result<HttpResponse, HttpResponseError> {
         let issue_list_url = Url::parse(&url.into())?;
         if issue_list_url.scheme() != "http" {
-            return Err(HttpResponseError::NotHttpScheme)
+            return Err(HttpResponseError::NotHttpScheme);
         }
         if let Ok(mut socket_addrs) = issue_list_url.to_socket_addrs() {
             let socket_addr = socket_addrs.next().unwrap();
             let connect_future = TcpStream::connect(&socket_addr);
+            let headers = Arc::new(Mutex::new(Vec::new()));
             let content = Arc::new(Mutex::new(String::new()));
             {
                 let content = content.clone();
+                let headers = headers.clone();
                 let task = connect_future
                     .and_then(move |mut socket| {
-                        let buffer = "GET / HTTP/2.0\nHost: localhost\nConnection: keep-alive\n\n".as_bytes();
+                        let buffer = "GET / HTTP/2.0\nHost: localhost\nConnection: keep-alive\n\n"
+                            .as_bytes();
                         loop {
                             match socket.poll_write(buffer) {
                                 Ok(Async::Ready(_)) => break,
                                 Err(err) => eprintln!("Error: {:?}", err),
-                                _ => {},
+                                _ => {}
                             }
 
                             let milli = time::Duration::from_millis(1);
@@ -200,6 +211,7 @@ impl SimpleClient {
                         }
 
                         let content = content.clone();
+                        let headers = headers.clone();
                         let mut in_http_header = false;
                         let mut http_content_remain: i64 = 0;
                         let http_stream = HttpStream::new(socket);
@@ -213,13 +225,13 @@ impl SimpleClient {
                                     *content = format!("{}{}\n", *content, input);
                                     if http_content_remain <= 0 {
                                         (*content).pop().unwrap();
-                                        return Err(())
+                                        return Err(());
                                     }
-                                    return Ok(())
+                                    return Ok(());
                                 }
                                 if let Some(_) = input.find("HTTP") {
                                     in_http_header = true;
-                                    return Ok(())
+                                    return Ok(());
                                 }
                                 match input {
                                     ref x if x.trim().is_empty() => {
@@ -228,11 +240,23 @@ impl SimpleClient {
                                     }
                                     header_content => {
                                         let mut header_content = header_content.splitn(2, ':');
-                                        let (title, content) = (header_content.next().unwrap(), header_content.next().unwrap());
-                                        if let Some(num) = title.trim().find("Content-Length") {
+                                        let (name, content) = (
+                                            header_content.next().unwrap(),
+                                            header_content.next().unwrap(),
+                                        );
+                                        let mut headers = headers.lock().unwrap();
+                                        (*headers).push(HttpHeader {
+                                            name: name.trim().to_string(),
+                                            content: content.trim().to_string(),
+                                        });
+                                        if let Some(num) = name.trim().find("Content-Length") {
                                             if num == 0 {
-                                                http_content_remain = content.trim().parse::<_>().unwrap();
-                                                eprintln!("Content remain: {:?}", &http_content_remain);
+                                                http_content_remain =
+                                                    content.trim().parse::<_>().unwrap();
+                                                eprintln!(
+                                                    "Content remain: {:?}",
+                                                    &http_content_remain
+                                                );
                                             }
                                         }
                                         Ok(())
@@ -250,10 +274,15 @@ impl SimpleClient {
                 rt.spawn(task);
                 rt.shutdown_on_idle().wait().unwrap();
             }
-            let content = content.clone();
             let content = content.lock().unwrap();
             eprintln!("Content:\n{:}", content);
-            Ok(HttpResponse::new((*content).clone()))
+            let headers = headers.lock().unwrap();
+            Ok(HttpResponse::new(
+                HttpHeaders {
+                    inner: (*headers).clone(),
+                },
+                (*content).clone(),
+            ))
         } else {
             Err(HttpResponseError::InvalidSocketAddress)
         }
@@ -262,22 +291,23 @@ impl SimpleClient {
     fn head<S: Into<String>>(&self, url: S) -> Result<HttpHeaders, HttpResponseError> {
         let issue_list_url = Url::parse(&url.into())?;
         if issue_list_url.scheme() != "http" {
-            return Err(HttpResponseError::NotHttpScheme)
+            return Err(HttpResponseError::NotHttpScheme);
         }
         if let Ok(mut socket_addrs) = issue_list_url.to_socket_addrs() {
             let socket_addr = socket_addrs.next().unwrap();
-            let mut inner = Arc::new(Mutex::new(Vec::new()));
+            let inner = Arc::new(Mutex::new(Vec::new()));
             let connect_future = TcpStream::connect(&socket_addr);
             {
                 let inner = inner.clone();
                 let task = connect_future
                     .and_then(move |mut socket| {
-                        let buffer = "HEAD / HTTP/2.0\nHost: localhost\nConnection: keep-alive\n\n".as_bytes();
+                        let buffer = "HEAD / HTTP/2.0\nHost: localhost\nConnection: keep-alive\n\n"
+                            .as_bytes();
                         loop {
                             match socket.poll_write(buffer) {
                                 Ok(Async::Ready(_)) => break,
                                 Err(err) => eprintln!("Error: {:?}", err),
-                                _ => {},
+                                _ => {}
                             }
 
                             let milli = time::Duration::from_millis(1);
@@ -287,7 +317,7 @@ impl SimpleClient {
 
                         let inner = inner.clone();
                         let mut in_http_header = false;
-                        let mut http_content_remain:i64 = 0;
+                        let mut http_content_remain: i64 = 0;
                         let http_stream = HttpStream::new(socket);
                         let lines_task = io::lines(http_stream)
                             .map_err(|err| eprintln!("Error: {:?}", err))
@@ -295,15 +325,16 @@ impl SimpleClient {
                                 eprintln!("Read : {}", input);
                                 if let Some(_) = input.find("HTTP") {
                                     in_http_header = true;
-                                    return Ok(())
+                                    return Ok(());
                                 }
                                 match input {
-                                    ref x if x.trim().is_empty() => {
-                                        Err(())
-                                    }
+                                    ref x if x.trim().is_empty() => Err(()),
                                     header_content => {
                                         let mut header_content = header_content.splitn(2, ':');
-                                        let (name, content) = (header_content.next().unwrap(), header_content.next().unwrap());
+                                        let (name, content) = (
+                                            header_content.next().unwrap(),
+                                            header_content.next().unwrap(),
+                                        );
                                         let mut inner = inner.lock().unwrap();
                                         (*inner).push(HttpHeader {
                                             name: name.trim().to_string(),
@@ -324,14 +355,10 @@ impl SimpleClient {
                 rt.spawn(task);
                 rt.shutdown_on_idle().wait().unwrap();
             }
-            let inner = inner.clone();
             let inner = inner.lock().unwrap();
             let inner = (*inner).clone();
-            Ok(HttpHeaders {
-                inner
-            })
-        }
-        else {
+            Ok(HttpHeaders { inner })
+        } else {
             Err(HttpResponseError::InvalidSocketAddress)
         }
     }
@@ -361,3 +388,10 @@ fn get_headers() {
     assert_eq!("glass-fi server", server_name);
 }
 
+#[test]
+fn get_headers_by_get_request() {
+    let client = SimpleClient::new();
+    let mut headers = client.get("http://127.0.0.1/").unwrap().head;
+    let server_name = headers.find(|x| x.name == "Server").unwrap().content;
+    assert_eq!("nginx/1.10.3 (Ubuntu)", server_name);
+}

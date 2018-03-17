@@ -60,7 +60,8 @@ impl HttpResponse {
 enum HttpResponseError {
     NotHttpScheme,
     ParseURL(url::ParseError),
-    Io(stdio::Error)
+    Io(stdio::Error),
+    InvalidSocketAddress,
 }
 
 impl fmt::Display for HttpResponseError {
@@ -69,6 +70,7 @@ impl fmt::Display for HttpResponseError {
             HttpResponseError::NotHttpScheme => write!(f, "Not HTTP Scheme: input string hasn't http scheme"),
             HttpResponseError::ParseURL(ref err) => write!(f, "Parse URL Error: {}", err),
             HttpResponseError::Io(ref err) => write!(f, "IO Error: {}", err),
+            HttpResponseError::InvalidSocketAddress => write!(f, "Invalid socket address: socket address is invalid or nothing"),
         }
     }
 
@@ -80,6 +82,7 @@ impl error::Error for HttpResponseError {
             HttpResponseError::NotHttpScheme => "This hasn't http scheme",
             HttpResponseError::ParseURL(ref err) => err.description(),
             HttpResponseError::Io(ref err) => err.description(),
+            HttpResponseError::InvalidSocketAddress => "Invalid socket address",
         }
     }
 
@@ -88,6 +91,7 @@ impl error::Error for HttpResponseError {
             HttpResponseError::NotHttpScheme => Some(&HttpResponseError::NotHttpScheme),
             HttpResponseError::ParseURL(ref err) => Some(err),
             HttpResponseError::Io(ref err) => Some(err),
+            HttpResponseError::InvalidSocketAddress => Some(&HttpResponseError::InvalidSocketAddress),
         }
     }
 }
@@ -251,19 +255,85 @@ impl SimpleClient {
             eprintln!("Content:\n{:}", content);
             Ok(HttpResponse::new((*content).clone()))
         } else {
-            Ok(HttpResponse::new("Hello World!"))
+            Err(HttpResponseError::InvalidSocketAddress)
         }
     }
 
     fn head<S: Into<String>>(&self, url: S) -> Result<HttpHeaders, HttpResponseError> {
-        let mut inner = Vec::new();
-        inner.push(HttpHeader {
-            name: "Server".to_string(),
-            content: "nginx/1.10.3 (Ubuntu)".to_string(),
-        });
-        Ok(HttpHeaders {
-            inner
-        })
+        let issue_list_url = Url::parse(&url.into())?;
+        if issue_list_url.scheme() != "http" {
+            return Err(HttpResponseError::NotHttpScheme)
+        }
+        if let Ok(mut socket_addrs) = issue_list_url.to_socket_addrs() {
+            let socket_addr = socket_addrs.next().unwrap();
+            let mut inner = Arc::new(Mutex::new(Vec::new()));
+            let connect_future = TcpStream::connect(&socket_addr);
+            {
+                let inner = inner.clone();
+                let task = connect_future
+                    .and_then(move |mut socket| {
+                        let buffer = "HEAD / HTTP/2.0\nHost: localhost\nConnection: keep-alive\n\n".as_bytes();
+                        loop {
+                            match socket.poll_write(buffer) {
+                                Ok(Async::Ready(_)) => break,
+                                Err(err) => eprintln!("Error: {:?}", err),
+                                _ => {},
+                            }
+
+                            let milli = time::Duration::from_millis(1);
+                            let now = time::Instant::now();
+                            thread::sleep(milli)
+                        }
+
+                        let inner = inner.clone();
+                        let mut in_http_header = false;
+                        let mut http_content_remain:i64 = 0;
+                        let http_stream = HttpStream::new(socket);
+                        let lines_task = io::lines(http_stream)
+                            .map_err(|err| eprintln!("Error: {:?}", err))
+                            .for_each(move |input| {
+                                eprintln!("Read : {}", input);
+                                if let Some(_) = input.find("HTTP") {
+                                    in_http_header = true;
+                                    return Ok(())
+                                }
+                                match input {
+                                    ref x if x.trim().is_empty() => {
+                                        Err(())
+                                    }
+                                    header_content => {
+                                        let mut header_content = header_content.splitn(2, ':');
+                                        let (name, content) = (header_content.next().unwrap(), header_content.next().unwrap());
+                                        let mut inner = inner.lock().unwrap();
+                                        (*inner).push(HttpHeader {
+                                            name: name.trim().to_string(),
+                                            content: content.trim().to_string(),
+                                        });
+                                        Ok(())
+                                    }
+                                }
+                            })
+                            .map_err(|err| eprintln!("Error: {:?}", err));
+                        let mut http_runtime = Runtime::new().unwrap();
+                        http_runtime.spawn(lines_task);
+                        http_runtime.shutdown_now().wait().unwrap();
+                        Ok(())
+                    })
+                    .map_err(|err| eprintln!("Error: {:?}", err));
+                let mut rt = Runtime::new().unwrap();
+                rt.spawn(task);
+                rt.shutdown_on_idle().wait().unwrap();
+            }
+            let inner = inner.clone();
+            let inner = inner.lock().unwrap();
+            let inner = (*inner).clone();
+            Ok(HttpHeaders {
+                inner
+            })
+        }
+        else {
+            Err(HttpResponseError::InvalidSocketAddress)
+        }
     }
 }
 
@@ -290,3 +360,4 @@ fn get_headers() {
     let server_name = headers.find(|x| x.name == "Server").unwrap().content;
     assert_eq!("glass-fi server", server_name);
 }
+

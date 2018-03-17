@@ -23,6 +23,24 @@ struct HttpBody {
     text: String
 }
 
+#[derive(Debug, Clone)]
+struct HttpHeader {
+    name: String,
+    content: String,
+}
+
+#[derive(Debug)]
+struct HttpHeaders {
+    inner: Vec<HttpHeader>,
+}
+
+impl Iterator for HttpHeaders {
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.clone().into_iter().next()
+    }
+
+    type Item = HttpHeader;
+}
 #[derive(Debug)]
 struct HttpResponse {
     body: HttpBody,
@@ -236,6 +254,17 @@ impl SimpleClient {
             Ok(HttpResponse::new("Hello World!"))
         }
     }
+
+    fn head<S: Into<String>>(&self, url: S) -> Result<HttpHeaders, HttpResponseError> {
+        let mut inner = Vec::new();
+        inner.push(HttpHeader {
+            name: "Server".to_string(),
+            content: "nginx/1.10.3 (Ubuntu)".to_string(),
+        });
+        Ok(HttpHeaders {
+            inner
+        })
+    }
 }
 
 #[test]
@@ -248,4 +277,16 @@ fn simple_get_http() {
     let response = client.get("http://127.0.0.1:81/").unwrap();
     let body_text = response.body.text;
     assert_eq!("Hello World?", body_text);
+}
+
+#[test]
+fn get_headers() {
+    let client = SimpleClient::new();
+    let mut headers = client.head("http://127.0.0.1/").unwrap();
+    let server_name = headers.find(|x| x.name == "Server").unwrap().content;
+    assert_eq!("nginx/1.10.3 (Ubuntu)", server_name);
+
+    let mut headers = client.head("http://127.0.0.1:10080/").unwrap();
+    let server_name = headers.find(|x| x.name == "Server").unwrap().content;
+    assert_eq!("glass-fi server", server_name);
 }

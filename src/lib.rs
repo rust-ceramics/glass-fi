@@ -43,7 +43,7 @@ pub struct HttpResponse {
 
 /// HTTP request which includes also body.
 #[derive(Debug)]
-struct HttpRequest {
+pub struct HttpRequest {
     version: f32,
     method: String,
     path: String,
@@ -53,7 +53,7 @@ struct HttpRequest {
 
 /// Builder struct for HTTP request.
 #[derive(Debug)]
-struct HttpRequestBuilder<VersionType, HostType, MethodType, PathType> {
+pub struct HttpRequestBuilder<VersionType, HostType, MethodType, PathType> {
     version: VersionType,
     host: HostType,
     method: MethodType,

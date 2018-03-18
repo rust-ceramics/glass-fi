@@ -41,8 +41,9 @@ pub struct HttpResponse {
     pub body: Vec<u8>,
 }
 
+/// HTTP request which includes also body.
 #[derive(Debug)]
-struct HttpRequest {
+pub struct HttpRequest {
     version: f32,
     method: String,
     path: String,
@@ -50,8 +51,9 @@ struct HttpRequest {
     body: Option<Vec<u8>>,
 }
 
+/// Builder struct for HTTP request.
 #[derive(Debug)]
-struct HttpRequestBuilder<VersionType, HostType, MethodType, PathType> {
+pub struct HttpRequestBuilder<VersionType, HostType, MethodType, PathType> {
     version: VersionType,
     host: HostType,
     method: MethodType,
@@ -61,6 +63,7 @@ struct HttpRequestBuilder<VersionType, HostType, MethodType, PathType> {
 }
 
 impl HttpRequestBuilder<(), (), (), ()> {
+    /// new HTTP Request Builder
     pub fn new() -> Self {
         HttpRequestBuilder {
             version: (),
@@ -74,6 +77,7 @@ impl HttpRequestBuilder<(), (), (), ()> {
 }
 
 impl HttpRequestBuilder<f32, String, String, String> {
+    /// build HTTP request
     pub fn build(self) -> HttpRequest {
         let mut head = self.head.clone();
         head.push(HttpHeader {
@@ -90,9 +94,10 @@ impl HttpRequestBuilder<f32, String, String, String> {
     }
 }
 
-impl<'http_req, VersionType, HostType, MethodType, PathType>
+impl<VersionType, HostType, MethodType, PathType>
     HttpRequestBuilder<VersionType, HostType, MethodType, PathType>
 {
+    /// HTTP version, ex. 1.1, 2.0
     pub fn version(self, version: f32) -> HttpRequestBuilder<f32, HostType, MethodType, PathType> {
         HttpRequestBuilder {
             version,
@@ -104,6 +109,7 @@ impl<'http_req, VersionType, HostType, MethodType, PathType>
         }
     }
 
+    /// request side host
     pub fn host<S: Into<String>>(
         self,
         host: S,
@@ -118,6 +124,7 @@ impl<'http_req, VersionType, HostType, MethodType, PathType>
         }
     }
 
+    /// request method
     pub fn method<S: Into<String>>(
         self,
         method: S,
@@ -132,6 +139,7 @@ impl<'http_req, VersionType, HostType, MethodType, PathType>
         }
     }
 
+    /// request http path
     pub fn path<S: Into<String>>(
         self,
         path: S,
@@ -146,6 +154,7 @@ impl<'http_req, VersionType, HostType, MethodType, PathType>
         }
     }
 
+    /// HTTP-request contents
     pub fn body<S: Into<String>>(self, body: S) -> Self {
         let body = body.into();
         let body = body.into_bytes();
@@ -159,6 +168,7 @@ impl<'http_req, VersionType, HostType, MethodType, PathType>
         }
     }
 
+    /// HTTP-request header
     pub fn header(self, http_header: HttpHeader) -> Self {
         let mut head = self.head.clone();
         head.push(http_header);
@@ -196,10 +206,10 @@ mod test_lib {
     #[test]
     fn new_http_request() {
         let _: HttpRequest = HttpRequestBuilder::new()
-            .version(2.0)
+            .version(2.0) // required
             .host("Host") // required
             .method("GET") // required
-            .path("/")
+            .path("/") // required
             .header(HttpHeader { // option
                 name: "Neko".to_string(),
                 content: "Meow".to_string(),

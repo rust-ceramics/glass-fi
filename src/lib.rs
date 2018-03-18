@@ -94,7 +94,7 @@ impl HttpRequestBuilder<f32, String, String, String> {
     }
 }
 
-impl<'http_req, VersionType, HostType, MethodType, PathType>
+impl<VersionType, HostType, MethodType, PathType>
     HttpRequestBuilder<VersionType, HostType, MethodType, PathType>
 {
     /// HTTP version, ex. 1.1, 2.0

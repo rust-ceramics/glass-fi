@@ -19,6 +19,13 @@ pub struct HttpHeaders {
     inner: Vec<HttpHeader>,
 }
 
+impl HttpHeaders {
+    /// new HTTP headers
+    pub fn new(inner: Vec<HttpHeader>) -> Self {
+        HttpHeaders { inner }
+    }
+}
+
 /// HTTP response which includes also body.
 #[derive(Debug)]
 pub struct HttpResponse<'http> {
@@ -47,5 +54,10 @@ mod test_lib {
             head: HttpHeaders { inner: Vec::new() },
             body: Box::new(&"".as_bytes()),
         };
+    }
+
+    #[test]
+    fn new_http_headers() {
+        HttpHeaders::new(Vec::new());
     }
 }

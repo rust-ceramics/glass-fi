@@ -1,13 +1,14 @@
 //! HTTP Listener
-use tokio::net::TcpListener;
+use net::http::Incoming;
 
+use tokio::net::TcpListener;
 use std::io;
 use std::net::SocketAddr;
 
 /// HTTP connection listener
 #[derive(Debug)]
 pub struct HttpListener {
-    tcp: TcpListener,
+    pub(crate) tcp: TcpListener,
 }
 
 impl HttpListener {
@@ -16,12 +17,18 @@ impl HttpListener {
         let tcp = TcpListener::bind(socket_address)?;
         Ok(HttpListener { tcp })
     }
+
+    /// get incoming HTTP streams
+    pub fn incoming(self) -> Incoming {
+        Incoming::new(self)
+    }
 }
 
 #[cfg(test)]
 mod listner_test {
     use tokio;
     use net::HttpListener;
+    use futures::Stream;
 
     #[test]
     fn new_listen() {

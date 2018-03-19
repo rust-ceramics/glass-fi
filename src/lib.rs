@@ -2,7 +2,11 @@
 //! glass-fi
 extern crate tokio;
 extern crate url;
+#[macro_use]
+extern crate futures;
+
 mod client;
+pub mod net;
 
 /// HTTP header struct
 #[derive(Debug, Clone)]

@@ -1,12 +1,21 @@
 //! HTTP Listener
 use tokio::net::TcpListener;
 
+use std::io;
 use std::net::SocketAddr;
 
 /// HTTP connection listener
 #[derive(Debug)]
 pub struct HttpListener {
     tcp: TcpListener,
+}
+
+impl HttpListener {
+    /// binding socket address(ex. 127.0.0.1:10080) for HttpListener
+    pub fn bind(socket_address: &SocketAddr) -> io::Result<Self> {
+        let tcp = TcpListener::bind(socket_address)?;
+        Ok(HttpListener { tcp })
+    }
 }
 
 #[cfg(test)]

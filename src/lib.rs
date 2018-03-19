@@ -3,6 +3,7 @@
 extern crate tokio;
 extern crate url;
 mod client;
+pub mod server;
 
 /// HTTP header struct
 #[derive(Debug, Clone)]

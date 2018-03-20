@@ -1,12 +1,12 @@
 **Note: for support questions, please use stackoverflow or our communities(Discord: https://discord.gg/fdsYYkh)**. This repository's issues are reserved for feature requests and bug reports.
 
-* **I'm submitting a ...**
-  - [ ] bug report
-  - [ ] feature request
-  - [ ] support request => Please do not submit support request here, see note at the top of this template.
+* **I'm submitting a ... 🤔**
+  - [ ] bug report 🐛
+  - [ ] feature request 🆕
+  - [ ] support request 👐=> Please do not submit support request here, see note at the top of this template.
 
 
-* **Do you want to request a *feature* or report a *bug*?**
+* **Do you want to request a *feature 🆕* or report a *bug 🐛*?**
 
 
 

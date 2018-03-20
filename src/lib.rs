@@ -33,11 +33,11 @@ impl HttpHeaders {
 /// HTTP response which includes also body.
 #[derive(Debug)]
 pub struct HttpResponse {
-    /// HTTP version, ex. HTTP/1.1, HTTP/2.0
+    /// HTTP version, e.g., HTTP/1.1, HTTP/2.0
     pub version: f32,
-    /// HTTP status code, ex. 200, 404
+    /// HTTP status code, e.g., 200, 404
     pub status_code: usize,
-    /// HTTP status string, ex. OK, Not Found
+    /// HTTP status string, e.g., OK, Not Found
     pub status_string: String,
     /// HTTP headers
     pub head: HttpHeaders,
@@ -101,7 +101,7 @@ impl HttpRequestBuilder<f32, String, String, String> {
 impl<VersionType, HostType, MethodType, PathType>
     HttpRequestBuilder<VersionType, HostType, MethodType, PathType>
 {
-    /// HTTP version, ex. 1.1, 2.0
+    /// HTTP version, e.g., 1.1, 2.0
     pub fn version(self, version: f32) -> HttpRequestBuilder<f32, HostType, MethodType, PathType> {
         HttpRequestBuilder {
             version,

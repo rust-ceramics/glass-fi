@@ -193,13 +193,16 @@ mod test_lib {
 
     #[test]
     fn new_http_response() {
-        HttpResponse {
-            version: 1.1,
-            status_code: 200,
-            status_string: "OK".to_string(),
-            head: HttpHeaders::new(Vec::new()),
-            body: Vec::new(),
-        };
+        let _: HttpResponse = HttpResponseBuilder::new()
+            .version(2.0) // required
+            .host("Host") // required
+            .status_code(200)
+            .status_string("OK")
+            .header(HttpHeader {
+                name: "Dog".to_string(),
+                content: "Bow-wow".to_string(),
+            })
+            .build();
     }
 
     #[test]
@@ -220,4 +223,5 @@ mod test_lib {
             })
             .build();
     }
+
 }

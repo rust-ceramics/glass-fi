@@ -38,7 +38,7 @@ mod listner_test {
         let server = listener
             .incoming()
             .map_err(|error| eprintln!("Error: {:?}", error))
-            .for_each(|socket| Ok(()));
+            .for_each(|(http_stream, http_request)| Ok(()));
         let mut rt = Runtime::new().unwrap();
         rt.spawn(server);
         rt.shutdown_now().wait().unwrap();

@@ -6,6 +6,7 @@ extern crate url;
 extern crate futures;
 
 pub mod net;
+pub mod info;
 
 /// HTTP header struct
 #[derive(Debug, Clone)]

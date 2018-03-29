@@ -1,5 +1,5 @@
 //! HTTP Listener
-use net::http::Incoming;
+use net::http1::Incoming;
 
 use tokio::net::TcpListener;
 use std::io;
@@ -27,7 +27,7 @@ impl HttpListener {
 #[cfg(test)]
 mod listner_test {
     use tokio::runtime::Runtime;
-    use net::HttpListener;
+    use net::http1::HttpListener;
     use futures::{Future, Stream};
 
     #[test]

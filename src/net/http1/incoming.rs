@@ -1,6 +1,6 @@
 //! HTTP incoming stream
-use net::http::HttpListener;
-use net::http::HttpStream;
+use net::http1::HttpListener;
+use net::http1::HttpStream;
 use info::http1::request::{HttpRequest, HttpRequestBuilder};
 
 use std::io;

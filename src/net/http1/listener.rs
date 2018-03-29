@@ -1,5 +1,5 @@
 //! HTTP Listener
-use net::http::Incoming;
+use net::http1::Incoming;
 
 use tokio::net::TcpListener;
 use std::io;
@@ -26,9 +26,8 @@ impl HttpListener {
 
 #[cfg(test)]
 mod listner_test {
-    use tokio;
     use tokio::runtime::Runtime;
-    use net::HttpListener;
+    use net::http1::HttpListener;
     use futures::{Future, Stream};
 
     #[test]
@@ -38,7 +37,7 @@ mod listner_test {
         let server = listener
             .incoming()
             .map_err(|error| eprintln!("Error: {:?}", error))
-            .for_each(|(http_stream, http_request)| Ok(()));
+            .for_each(|(_http_stream, _http_request)| Ok(()));
         let mut rt = Runtime::new().unwrap();
         rt.spawn(server);
         rt.shutdown_now().wait().unwrap();

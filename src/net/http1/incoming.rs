@@ -1,7 +1,7 @@
 //! HTTP incoming stream
-use net::http::HttpListener;
-use net::http::HttpStream;
-use {HttpRequest, HttpRequestBuilder};
+use net::http1::HttpListener;
+use net::http1::HttpStream;
+use info::http1::request::{HttpRequest, HttpRequestBuilder};
 
 use std::io;
 use futures::stream::Stream;
@@ -24,7 +24,7 @@ impl Stream for Incoming {
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        let (socket, _) = try_ready!(self.inner.tcp.poll_accept());
+        let (_socket, _) = try_ready!(self.inner.tcp.poll_accept());
         Ok(Async::Ready(Some((HttpStream{}, HttpRequestBuilder::new()
                               .version(2.0)
                               .host("A")

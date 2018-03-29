@@ -1,5 +1,4 @@
-//! HTTP struct and function
+//! HTTP Server Client function
 
-mod http;
+pub mod http1;
 
-pub use self::http::HttpListener;

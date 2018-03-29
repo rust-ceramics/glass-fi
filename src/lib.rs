@@ -8,27 +8,7 @@ extern crate futures;
 pub mod net;
 pub mod info;
 
-/// HTTP header struct
-#[derive(Debug, Clone)]
-pub struct HttpHeader {
-    /// header name
-    pub name: String,
-    /// header content
-    pub content: String,
-}
-
-/// multiple HTTP headers
-#[derive(Debug)]
-pub struct HttpHeaders {
-    inner: Vec<HttpHeader>,
-}
-
-impl HttpHeaders {
-    /// new HTTP headers
-    pub fn new(inner: Vec<HttpHeader>) -> Self {
-        HttpHeaders { inner }
-    }
-}
+use info::http1::header::{HttpHeader, HttpHeaders};
 
 /// HTTP response which includes also body.
 #[derive(Debug)]

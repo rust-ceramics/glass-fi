@@ -2,3 +2,5 @@
 //!
 //! It consists of requests and responses,
 //! and accompanying headers.
+
+pub mod header;

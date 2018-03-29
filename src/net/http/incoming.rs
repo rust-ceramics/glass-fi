@@ -24,7 +24,7 @@ impl Stream for Incoming {
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        let (socket, _) = try_ready!(self.inner.tcp.poll_accept());
+        let (_socket, _) = try_ready!(self.inner.tcp.poll_accept());
         Ok(Async::Ready(Some((HttpStream{}, HttpRequestBuilder::new()
                               .version(2.0)
                               .host("A")

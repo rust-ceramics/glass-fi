@@ -26,7 +26,6 @@ impl HttpListener {
 
 #[cfg(test)]
 mod listner_test {
-    use tokio;
     use tokio::runtime::Runtime;
     use net::HttpListener;
     use futures::{Future, Stream};
@@ -38,7 +37,7 @@ mod listner_test {
         let server = listener
             .incoming()
             .map_err(|error| eprintln!("Error: {:?}", error))
-            .for_each(|(http_stream, http_request)| Ok(()));
+            .for_each(|(_http_stream, _http_request)| Ok(()));
         let mut rt = Runtime::new().unwrap();
         rt.spawn(server);
         rt.shutdown_now().wait().unwrap();

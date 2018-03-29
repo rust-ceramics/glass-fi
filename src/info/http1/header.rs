@@ -23,7 +23,7 @@ impl HttpHeaders {
 
 #[cfg(test)]
 mod test_header {
-    use info::http1::header::{HttpHeader, HttpHeaders};
+    use info::http1::header::HttpHeaders;
 
     #[test]
     fn new_headers() {

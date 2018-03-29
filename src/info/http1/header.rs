@@ -21,3 +21,13 @@ impl HttpHeaders {
     }
 }
 
+#[cfg(test)]
+mod test_header {
+    use info::http1::header::{HttpHeader, HttpHeaders};
+
+    #[test]
+    fn new_headers() {
+        HttpHeaders::new(Vec::new());
+    }
+
+}

@@ -1,7 +1,7 @@
 //! HTTP incoming stream
 use net::http::HttpListener;
 use net::http::HttpStream;
-use {HttpRequest, HttpRequestBuilder};
+use info::http1::request::{HttpRequest, HttpRequestBuilder};
 
 use std::io;
 use futures::stream::Stream;
